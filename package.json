@@ -14,6 +14,8 @@
     "dotenv": "^6.2.0",
     "express": "^4.16.4",
     "sendgrid": "^5.2.3",
-    "twilio": "^3.27.1"
+    "twilio": "^3.27.1",
+    "lodash": "^3.10.1",
+    "swagger-client": "^2.1.8"
   }
 }
