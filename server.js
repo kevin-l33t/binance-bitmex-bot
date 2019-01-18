@@ -42,14 +42,17 @@ function buyOrder(symbol){
     .then(function(){
       client.Position.Position_get()
       .then(function(response){
-        if (response.obj[0].isOpen) {
+        var activeWallet = response.obj.filter(function(wallet) {
+          return wallet.symbol === symbol
+        })[0]
+        if (activeWallet.isOpen) {
           // if there is an active long position, ignore message.
-          if (response.obj[0].currentQty > 0) {
+          if (activeWallet.currentQty > 0) {
             console.log("Long position already opened.")
             placeOrder(client, symbol, 'Buy')
             return
           // if there is an active short position, close at market
-          } else if (response.obj[0].currentQty < 0) {
+          } else if (activeWallet.currentQty < 0) {
             client.Order.Order_closePosition({symbol: symbol})
             .then(function(response){
               console.log('Open short order has been closed.')
@@ -57,23 +60,28 @@ function buyOrder(symbol){
             })
             .catch(function(e){
               sendErrorEmail(e);
+              console.log(e);
             })
           }
         } else {
+          console.log(response.obj)
           console.log('Nothing open.')
           placeOrder(client, symbol, 'Buy')
         }
       })
       .catch(function(e){
         sendErrorEmail(e);
+        console.log(e);
       }) 
     })
     .catch(function(e){
       sendErrorEmail(e);
+      console.log(e);
     })
   })
   .catch(function(e){
     sendErrorEmail(e);
+    console.log(e);
   })
 }
 
@@ -87,20 +95,25 @@ function sellOrder(symbol){
   })
   .then(function(client) {
     inspect(client.apis)
-    // Comment out if you're not requesting any user data.
-    client.clientAuthorizations.add("apiKey", new BitMEXAPIKeyAuthorization(process.env.BITMEX_API_KEY, process.env.BITMEX_API_SECRET));
+
+    client.clientAuthorizations.add("apiKey", new BitMEXAPIKeyAuthorization(process.env.BITMEX_API_KEY, process.env.BITMEX_API_SECRET))
+    // .then()
+    // .catch(function(e){console.log(e)})
+
     // First cancel any unfilled orders
     client.Order.Order_cancelAll()
     .then(function(){
       client.Position.Position_get()
       .then(function(response){
-        if (response.obj[0].isOpen) {
-          // if there is an active long position, ignore message.
-          if (response.obj[0].currentQty < 0) {
+        var activeWallet = response.obj.filter(function(wallet) {
+          return wallet.symbol === symbol
+        })[0]
+        if (activeWallet.isOpen) {
+          if (activeWallet.currentQty < 0) {
             console.log("Short position already opened.")
             placeOrder(client, symbol, 'Sell')
           // if there is an active short position, close at market
-          } else if (response.obj[0].currentQty > 0) {
+          } else if (activeWallet.currentQty > 0) {
             client.Order.Order_closePosition({symbol: symbol})
             .then(function(response){
               console.log('Open long order has been closed.')
@@ -108,6 +121,7 @@ function sellOrder(symbol){
             })
             .catch(function(e){
               sendErrorEmail(e);
+              console.log(e);
             })
           }
         } else {
@@ -117,14 +131,17 @@ function sellOrder(symbol){
       })
       .catch(function(e){
         sendErrorEmail(e);
+        console.log(e);
       }) 
     })
     .catch(function(e){
       sendErrorEmail(e);
+      console.log(e);
     })
   })
   .catch(function(e){
-    sendErrorEmail(e)
+    sendErrorEmail(e);
+    console.log(e);
   })
 }
 
@@ -133,49 +150,56 @@ function placeOrder(client, symbol, side){
   client.Position.Position_updateLeverage({symbol: 'XBTUSD', leverage: process.env.LEVERAGE})
   .then(function(leverage){
     console.log(leverage)
-    var percent = leverage 
-    client.User.User_getMargin().
-    then(function(wallet){
-      console.log(wallet)
+    var percent = leverage;
+    client.User.User_getMargin()
+    .then(function(wallet){
       var balance = wallet.obj.availableMargin / 100000000;
-      console.log(balance)
-        client.OrderBook.OrderBook_getL2({symbol: symbol})
-        .then(function(orders){
-          if (side === "Buy") {
-            var price = orders.obj[25].price;
-          } else {
-            var price = orders.obj[24].price;
-          }
-          var amount = Math.floor((price * balance) * (process.env.LEVERAGE * ((100 - process.env.LEVERAGE * .15)/100)));
-          console.log(amount)
-          if (process.env.ORDER_TYPE === "limit"){
-            if (amount > 0) {
-              client.Order.Order_new({symbol: symbol, orderQty: amount, price: price, side: side})
-              .then(function(order){
-                console.log(order)
-              })
-              .catch(function(e){
-                console.log(e)
-              })
-            } else { 
-              console.log('All funds in use.')
-            }
-          } else {
-            client.Order.Order_new({symbol: symbol, ordType: 'Market', orderQty: amount, side: side})
-            .then(function(response){
-
+      client.OrderBook.OrderBook_getL2({symbol: symbol})
+      .then(function(orders){
+        if (side === "Buy") {
+          var price = orders.obj[25].price;
+        } else {
+          var price = orders.obj[24].price;
+        }
+        var amount = Math.floor((price * balance) * (process.env.LEVERAGE * ((100 - process.env.LEVERAGE * .15)/100)));
+        console.log(amount)
+        if (process.env.ORDER_TYPE === "limit"){
+          if (amount > 0) {
+            client.Order.Order_new({symbol: symbol, orderQty: amount, price: price, side: side})
+            .then(function(order){
+              console.log(order)
             })
-            .catch(function(e) {
+            .catch(function(e){
               console.log(e)
             })
+          } else { 
+            console.log('All funds in use.')
           }
-        })
-        .catch(function(e){sendErrorEmail(e)})
+        } else {
+          client.Order.Order_new({symbol: symbol, ordType: 'Market', orderQty: amount, side: side})
+          .then(function(response){
+
+          })
+          .catch(function(e) {
+            console.log(e)
+          })
+        }
+      })
+      .catch(
+        function(e){
+          sendErrorEmail(e);
+          console.log(e);
+      })
+    })
+    .catch(function(e){
+      sendErrorEmail(e);
+      console.log(e);
     })
   })
   .catch(function(e){
-    console.log(e)
-    console.log("You tried to change the leverage on an already open order and don't have sufficient funds to do so")
+    sendErrorEmail(e);
+    console.log(e);
+    console.log("You tried to change the leverage on an already open order and don't have sufficient funds to do so");
   })
   
 }
@@ -185,11 +209,24 @@ app.get('/', function (req, res) {
 	res.send('Hello World!');
 });
 
+
+var bitmexPairs = ['XBTUSD', 'XBTJPY', 'ADAH19', 'BCHH19', 'EOSH19', 'ETHUSD', 'LTCH19', 'TRXH19', 'XRPH19', 'XBTKRW'];
+
 // where text messages are sent
 app.post('/trade_notification', function(req, res) {
 	var tradeNotification = req.body.Body;
-  var pair = tradeNotification.split("Symbol: ")[1].split(" ")[0];
-  var side = tradeNotification.split("Side: ")[1].split(" ")[0];
+  var pair = tradeNotification.split("Symbol: ")[1].split("\n")[0];
+  var side = tradeNotification.split("Side: ")[1].split("\n")[0];
+
+  if (pair) {
+    if (side === "BUY") {
+      buyOrder(pair)
+    } else {
+      console.log(pair)
+      sellOrder(pair)
+    }
+  }
+  res.sendStatus(200);
 });
 
 app.listen(3000, function () {
@@ -205,4 +242,4 @@ function inspect(client) {
   console.log("------------------------\n");
 }
 
-buyOrder('XBTUSD')
+console.log("Running.")
