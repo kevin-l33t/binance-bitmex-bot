@@ -57,7 +57,6 @@ var socketsOpen = [];
 
 function openBitmexSocket(symbol) {
   if (socketsOpen.indexOf(symbol) === -1) {
-    console.log('asdf')
     bitmexSocket.addStream(symbol, 'order', function(data, symbol, tableName) {
       socketsOpen.push(symbol);
       for (var i=0; i<data.length; i++) {
@@ -133,7 +132,6 @@ function buyOrder(symbol, retry){
     pendingOrders = [];
     api.Position.Position_get()
     .then(function(response){
-      console.log(response)
       var activeWallet = response.obj.filter(function(wallet) {
         return wallet.symbol === symbol
       })[0]
@@ -147,16 +145,19 @@ function buyOrder(symbol, retry){
           console.log("Long position already opened.")
           api.User.User_getMargin()
           .then(function(balance){
-            console.log(balance.obj.availableMargin)
+            console.log("Available balance: " + balance.obj.availableMargin)
             if (balance.obj.availableMargin > 30000) {
+              console.log("Placing another long order for the remaining balance.")
               placeOrder(api, symbol, 'Buy', retry)
+            } else {
+              console.log("Full balance is invested in an open long position, nothing is being changed.")
             }
           })
         // if there is an active short order, close at market
         } else if (activeWallet.currentQty < 0) {
           api.Order.Order_closePosition({symbol: symbol})
           .then(function(response){
-            console.log('Open short order has been closed.')
+            console.log('Open short order has been closed at market rate.')
             placeOrder(api, symbol, 'Buy', retry)
           })
           .catch(function(e){
@@ -165,8 +166,7 @@ function buyOrder(symbol, retry){
           })
         }
       } else {
-
-        console.log('Nothing open.')
+        console.log('No orders currently open. Placing buy/long order...')
         placeOrder(api, symbol, 'Buy', retry)
       }
     })
@@ -202,14 +202,17 @@ function sellOrder(symbol, retry){
           api.User.User_getMargin()
           .then(function(balance){
             if (balance.obj.availableMargin > 30000) {
+              console.log("Placing another short order for the remaining balance.")
               placeOrder(api, symbol, 'Sell', retry)
+            } else {
+              console.log("Full balance is invested in an open short position, nothing is being changed.")
             }
           })
         // if there is an active long order, close at market
         } else if (activeWallet.currentQty > 0) {
           api.Order.Order_closePosition({symbol: symbol})
           .then(function(response){
-            console.log('Open long order has been closed.')
+            console.log('Open long order has been closed at market rate.')
             placeOrder(api, symbol, 'Sell', retry)
           })
           .catch(function(e){
@@ -218,7 +221,7 @@ function sellOrder(symbol, retry){
           })
         }
       } else {
-        console.log('Nothing open.');
+        console.log('No orders currently open. Placing buy/long order...');
         placeOrder(api, symbol, 'Sell', retry);
       }
     })
@@ -259,7 +262,7 @@ function placeOrder(client, symbol, side, retry){
           if (amount > 0) {
             client.Order.Order_new({symbol: symbol, orderQty: amount, price: price, side: side})
             .then(function(order){
-              console.log(order)
+              console.log("Limit order placed for " + response.obj.orderQty + " contracts. Order status: " + response.obj.ordStatus)
               sendLimitOrderEmail(order.obj)
               setTimeout(function(){
                 pendingOrders.push(order.obj.orderID);
@@ -276,6 +279,7 @@ function placeOrder(client, symbol, side, retry){
                 var newAmount = Math.floor((wallet.obj.availableMargin / cost) * .98);
                 client.Order.Order_new({symbol: symbol, orderQty: newAmount, price: price, side: side})
                 .then(function(order){
+                  console.log("Limit order placed for " + response.obj.orderQty + " contracts. Order status: " + response.obj.ordStatus)
                   sendLimitOrderEmail(order.obj)
                   setTimeout(function(){
                     pendingOrders.push(order.obj.orderID);
@@ -284,7 +288,7 @@ function placeOrder(client, symbol, side, retry){
                   },1000)
                 })
                 .catch(function(e){
-                  console.log("There was an issue calculating your max order. Check funds.")
+                  console.log("There was an issue calculating your max order. Try reducing the leverage.")
                   sendErrorEmail(e)
                 })
               }
