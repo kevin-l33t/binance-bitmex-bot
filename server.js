@@ -332,17 +332,24 @@ var bitmexPairs = ['XBTUSD', 'XBTJPY', 'ADAH19', 'BCHH19', 'EOSH19', 'ETHUSD', '
 
 // where text messages are sent
 app.post('/trade_notification', function(req, res) {
-	var tradeNotification = req.body.Body;
-  var pair = tradeNotification.split("Symbol: ")[1].split("\n")[0];
-  var side = tradeNotification.split("Side: ")[1].split("\n")[0];
+	var tradeNotification = req.body.Body.toLowerCase();
 
-  if (pair) {
-    if (side === "BUY") {
-      buyOrder(pair, process.env.RETRY)
-    } else {
-      sellOrder(pair, process.env.RETRY)
+  if (tradeNotification.includes('bitmex')) {
+    if (tradeNotification.includes('buy')) {
+      for (var i=0; i<bitmexPairs.length; i++) {
+        if (tradeNotification.includes(bitmexPairs[i].toLowerCase())) {
+          buyOrder(bitmexPairs[i], process.env.RETRY)
+        }
+      }
+    } else if (tradeNotification.includes('sell')) {
+      for (var i=0; i<bitmexPairs.length; i++) {
+        if (tradeNotification.includes(bitmexPairs[i].toLowerCase())) {
+          sellOrder(bitmexPairs[i], process.env.RETRY)
+        }
+      }
     }
   }
+
   res.sendStatus(200);
 });
 
