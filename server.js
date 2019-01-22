@@ -133,9 +133,14 @@ function buyOrder(symbol, retry){
     pendingOrders = [];
     api.Position.Position_get()
     .then(function(response){
+      console.log(response)
       var activeWallet = response.obj.filter(function(wallet) {
         return wallet.symbol === symbol
       })[0]
+      if (!activeWallet) {
+        placeOrder(api, symbol, 'Buy', retry)
+        return
+      }
       if (activeWallet.isOpen) {
         // if there is an active long position, ignore message.
         if (activeWallet.currentQty > 0) {
@@ -186,6 +191,10 @@ function sellOrder(symbol, retry){
       var activeWallet = response.obj.filter(function(wallet) {
         return wallet.symbol === symbol
       })[0]
+      if (!activeWallet) {
+        placeOrder(api, symbol, 'Sell', retry)
+        return
+      }
       if (activeWallet.isOpen) {
         // if there is an active short position, ignore message.
         if (activeWallet.currentQty < 0) {
@@ -226,7 +235,7 @@ function sellOrder(symbol, retry){
 
 function placeOrder(client, symbol, side, retry){
   //first set leverage, then purchase amount * leverage
-  client.Position.Position_updateLeverage({symbol: 'XBTUSD', leverage: process.env.LEVERAGE})
+  client.Position.Position_updateLeverage({symbol: symbol, leverage: process.env.LEVERAGE})
   .then(function(leverage){
     var percent = leverage.obj.initMarginReq + leverage.obj.maintMarginReq + leverage.obj.commission;
     client.User.User_getMargin()
@@ -238,8 +247,14 @@ function placeOrder(client, symbol, side, retry){
           var price = orders.obj[25].price;
         } else {
           var price = orders.obj[24].price;
+          console.log(price)
         }
-        var amount = Math.floor((price * balance) * (process.env.LEVERAGE * ((100 - process.env.LEVERAGE * .15)/100)));
+        if (price < 1) {
+          var amount = Math.floor((balance / price) * (process.env.LEVERAGE * ((100 - process.env.LEVERAGE * .15)/100)));  
+        } else {
+          var amount = Math.floor((price * balance) * (process.env.LEVERAGE * ((100 - process.env.LEVERAGE * .15)/100)));
+        }
+        console.log(price, balance, amount)
         if (process.env.ORDER_TYPE === "limit") {
           if (amount > 0) {
             client.Order.Order_new({symbol: symbol, orderQty: amount, price: price, side: side})
@@ -258,7 +273,7 @@ function placeOrder(client, symbol, side, retry){
                 var price = orders.obj[24].price;
                 var balance = (wallet.obj.availableMargin - wallet.obj.grossExecCost);
                 var cost = num / amount;
-                var newAmount = Math.floor(wallet.obj.availableMargin / cost);
+                var newAmount = Math.floor((wallet.obj.availableMargin / cost) * .98);
                 client.Order.Order_new({symbol: symbol, orderQty: newAmount, price: price, side: side})
                 .then(function(order){
                   sendLimitOrderEmail(order.obj)
@@ -269,7 +284,7 @@ function placeOrder(client, symbol, side, retry){
                   },1000)
                 })
                 .catch(function(e){
-                  console.log(e)
+                  console.log("There was an issue calculating your max order. Check funds.")
                   sendErrorEmail(e)
                 })
               }
