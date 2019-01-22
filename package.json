@@ -10,12 +10,14 @@
   "license": "ISC",
   "dependencies": {
     "@sendgrid/mail": "^6.3.1",
+    "bitmex-realtime-api": "^0.4.0",
     "body-parser": "^1.18.3",
     "dotenv": "^6.2.0",
     "express": "^4.16.4",
-    "sendgrid": "^5.2.3",
-    "twilio": "^3.27.1",
+    "http": "0.0.0",
     "lodash": "^3.10.1",
-    "swagger-client": "^2.1.8"
+    "sendgrid": "^5.2.3",
+    "swagger-client": "^2.1.8",
+    "twilio": "^3.27.1"
   }
 }

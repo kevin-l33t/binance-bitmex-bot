@@ -3,81 +3,172 @@ require('dotenv').config()
 var express = require('express');
 var app = express();
 var bodyParser = require('body-parser');
+
 var sgMail = require('@sendgrid/mail');
 var SwaggerClient = require("swagger-client");
-var _ = require('lodash');
+var BitMEXClient = require('bitmex-realtime-api');
 var BitMEXAPIKeyAuthorization = require('./lib/BitMEXAPIKeyAuthorization');
+
+var bitmexSocket = new BitMEXClient({testnet: true, apiKeyID: process.env.BITMEX_API_KEY, apiKeySecret: process.env.BITMEX_API_SECRET});
+
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 app.use(bodyParser.urlencoded({ extended: false }));
 
-// function sendEmail(message, email){
-// 	const msg = {
-// 	  to: process.env.NOTIFY_EMAIL,
-// 	  from: 'test@example.com',
-// 	  subject: 'Sending with SendGrid is Fun',
-// 	  text: 'and easy to do anywhere, even with Node.js',
-// 	  html: '<strong>and easy to do anywhere, even with Node.js</strong>',
-// 	};
-// 	sgMail.send(msg);
-// }
 
+function sendEmail(message, subject){
+	const msg = {
+	  to: process.env.NOTIFY_EMAIL,
+	  from: 'BitMEX@bot.com',
+	  subject: subject,
+	  text: message
+	};
+	sgMail.send(msg);
+}
 
-function buyOrder(symbol){
+function sendLimitOrderEmail(order) {
+  var orderMsg = "";
+  var subjectWord = order.ordStatus === "Filled" ? "filled" : "placed";
+  var subject = order.ordType + " " + order.side + " order " + subjectWord + " for " + order.symbol 
+  orderMsg += subject + ".\n\n";
+  orderMsg += "Order Quantity: " + order.orderQty + "\n\n";
+  orderMsg += "Order Price: " + order.price + "\n\n";
+  orderMsg += "Order Status: " + order.ordStatus + ".";
+  sendEmail(orderMsg, subject);
+}
 
-  // Check positions, if already long or short, do nothing, if opposite, sell at market
-  new SwaggerClient({
-    // Switch this to `www.bitmex.com` when you're ready to try it out for real.
-    // Don't forget the `www`!
-    url: 'https://testnet.bitmex.com/api/explorer/swagger.json',
-    usePromise: true
-  })
-  .then(function(client) {
-    inspect(client.apis)
-    // Comment out if you're not requesting any user data.
-    client.clientAuthorizations.add("apiKey", new BitMEXAPIKeyAuthorization(process.env.BITMEX_API_KEY, process.env.BITMEX_API_SECRET));
+function sendMarketOrderEmail(order) {
+  var orderMsg = "";
+  var subject = order.ordType + " " + order.side + " order placed for " + order.symbol;
+  orderMsg += subject + ".\n\n";
+  orderMsg += "Order Quantity: " + order.orderQty + "\n\n";
+  orderMsg += "Order Price: " + order.price + "\n\n";
+  orderMsg += "Order Status: " + order.ordStatus + ".";
+  sendEmail(orderMsg, subject);
+}
 
-    // First cancel any unfilled orders
-    client.Order.Order_cancelAll()
-    .then(function(){
-      client.Position.Position_get()
-      .then(function(response){
-        var activeWallet = response.obj.filter(function(wallet) {
-          return wallet.symbol === symbol
-        })[0]
-        if (activeWallet.isOpen) {
-          // if there is an active long position, ignore message.
-          if (activeWallet.currentQty > 0) {
-            console.log("Long position already opened.")
-            placeOrder(client, symbol, 'Buy')
-            return
-          // if there is an active short position, close at market
-          } else if (activeWallet.currentQty < 0) {
-            client.Order.Order_closePosition({symbol: symbol})
-            .then(function(response){
-              console.log('Open short order has been closed.')
-              placeOrder(client, symbol, 'Buy')
-            })
-            .catch(function(e){
-              sendErrorEmail(e);
-              console.log(e);
-            })
+function sendErrorEmail(e) {
+  var subject = "BitMEX Bot: An Error has Occurred."
+  sendEmail(e, subject);
+}
+
+var pendingOrders = [];
+var socketsOpen = [];
+
+function openBitmexSocket(symbol) {
+  if (socketsOpen.indexOf(symbol) === -1) {
+    console.log('asdf')
+    bitmexSocket.addStream(symbol, 'order', function(data, symbol, tableName) {
+      socketsOpen.push(symbol);
+      for (var i=0; i<data.length; i++) {
+        for (var x=0; x<pendingOrders.length; x++) {
+          if (data[i].orderID === pendingOrders[x]) {
+            if (data[i].ordStatus === "Filled") {
+              pendingOrders.splice(x, 1);
+              sendLimitOrderEmail(data[i]);
+            }
+          }
+        }
+      }
+    })
+  }
+}
+
+function retryLoop(retries, timeout, orderID, symbol, side, price) {
+  if (retries === 0) {
+    console.log("Out of retries, stopping.")
+  }
+  var milliseconds = timeout * 1000;
+  setTimeout(function(){
+    if (pendingOrders.indexOf(orderID) !== -1) {
+      api.OrderBook.OrderBook_getL2({symbol: symbol})
+      .then(function(orders) {
+        if (side === "Buy") {
+          if (orders.obj[25].price !== price) {
+            buyOrder(symbol, retries)
+          } else {
+            console.log('Price hasn\'t changed. Retries left: ' + retries);
+            retryLoop(retries - 1, timeout, orderID, symbol, side, price);
           }
         } else {
-          console.log(response.obj)
-          console.log('Nothing open.')
-          placeOrder(client, symbol, 'Buy')
+          if (orders.obj[24].price !== price) {
+            sellOrder(symbol, retries)
+          } else {
+            console.log('Price hasn\'t changed. Retries left: ' + retries);
+            retryLoop(retries - 1, timeout, orderID, symbol, side, price);
+          }
         }
       })
       .catch(function(e){
         sendErrorEmail(e);
         console.log(e);
-      }) 
+      })
+    }
+  }, milliseconds)
+}
+
+var api;
+
+new SwaggerClient({
+  // Switch this to `www.bitmex.com` when you're ready to try it out for real.
+  // Don't forget the `www`!
+  url: 'https://testnet.bitmex.com/api/explorer/swagger.json',
+  usePromise: true
+})
+.then(function(client) {
+  inspect(client.apis)
+  // Comment out if you're not requesting any user data.
+  client.clientAuthorizations.add("apiKey", new BitMEXAPIKeyAuthorization(process.env.BITMEX_API_KEY, process.env.BITMEX_API_SECRET));
+  api = client;
+})
+.catch(function(e){
+  console.log(e);
+  sendErrorEmail(e);
+})
+
+
+function buyOrder(symbol, retry){
+  api.Order.Order_cancelAll()
+  .then(function(){
+    pendingOrders = [];
+    api.Position.Position_get()
+    .then(function(response){
+      var activeWallet = response.obj.filter(function(wallet) {
+        return wallet.symbol === symbol
+      })[0]
+      if (activeWallet.isOpen) {
+        // if there is an active long position, ignore message.
+        if (activeWallet.currentQty > 0) {
+          console.log("Long position already opened.")
+          api.User.User_getMargin()
+          .then(function(balance){
+            console.log(balance.obj.availableMargin)
+            if (balance.obj.availableMargin > 30000) {
+              placeOrder(api, symbol, 'Buy', retry)
+            }
+          })
+        // if there is an active short order, close at market
+        } else if (activeWallet.currentQty < 0) {
+          api.Order.Order_closePosition({symbol: symbol})
+          .then(function(response){
+            console.log('Open short order has been closed.')
+            placeOrder(api, symbol, 'Buy', retry)
+          })
+          .catch(function(e){
+            console.log(e);
+            sendErrorEmail(e);
+          })
+        }
+      } else {
+
+        console.log('Nothing open.')
+        placeOrder(api, symbol, 'Buy', retry)
+      }
     })
     .catch(function(e){
       sendErrorEmail(e);
       console.log(e);
-    })
+    }) 
   })
   .catch(function(e){
     sendErrorEmail(e);
@@ -85,59 +176,47 @@ function buyOrder(symbol){
   })
 }
 
-function sellOrder(symbol){
-  // Check positions, if already long or short, do nothing, if opposite, sell at market
-  new SwaggerClient({
-    // Switch this to `www.bitmex.com` when you're ready to try it out for real.
-    // Don't forget the `www`!
-    url: 'https://testnet.bitmex.com/api/explorer/swagger.json',
-    usePromise: true
-  })
-  .then(function(client) {
-    inspect(client.apis)
-
-    client.clientAuthorizations.add("apiKey", new BitMEXAPIKeyAuthorization(process.env.BITMEX_API_KEY, process.env.BITMEX_API_SECRET))
-    // .then()
-    // .catch(function(e){console.log(e)})
-
-    // First cancel any unfilled orders
-    client.Order.Order_cancelAll()
-    .then(function(){
-      client.Position.Position_get()
-      .then(function(response){
-        var activeWallet = response.obj.filter(function(wallet) {
-          return wallet.symbol === symbol
-        })[0]
-        if (activeWallet.isOpen) {
-          if (activeWallet.currentQty < 0) {
-            console.log("Short position already opened.")
-            placeOrder(client, symbol, 'Sell')
-          // if there is an active short position, close at market
-          } else if (activeWallet.currentQty > 0) {
-            client.Order.Order_closePosition({symbol: symbol})
-            .then(function(response){
-              console.log('Open long order has been closed.')
-              placeOrder(client, symbol, 'Sell')
-            })
-            .catch(function(e){
-              sendErrorEmail(e);
-              console.log(e);
-            })
-          }
-        } else {
-          console.log('Nothing open.')
-          placeOrder(client, symbol, 'Sell')
+function sellOrder(symbol, retry){
+  // First cancel any unfilled orders
+  api.Order.Order_cancelAll()
+  .then(function(){
+    pendingOrders = [];
+    api.Position.Position_get()
+    .then(function(response){
+      var activeWallet = response.obj.filter(function(wallet) {
+        return wallet.symbol === symbol
+      })[0]
+      if (activeWallet.isOpen) {
+        // if there is an active short position, ignore message.
+        if (activeWallet.currentQty < 0) {
+          console.log("Short position already opened.")
+          api.User.User_getMargin()
+          .then(function(balance){
+            if (balance.obj.availableMargin > 30000) {
+              placeOrder(api, symbol, 'Sell', retry)
+            }
+          })
+        // if there is an active long order, close at market
+        } else if (activeWallet.currentQty > 0) {
+          api.Order.Order_closePosition({symbol: symbol})
+          .then(function(response){
+            console.log('Open long order has been closed.')
+            placeOrder(api, symbol, 'Sell', retry)
+          })
+          .catch(function(e){
+            sendErrorEmail(e);
+            console.log(e);
+          })
         }
-      })
-      .catch(function(e){
-        sendErrorEmail(e);
-        console.log(e);
-      }) 
+      } else {
+        console.log('Nothing open.');
+        placeOrder(api, symbol, 'Sell', retry);
+      }
     })
     .catch(function(e){
       sendErrorEmail(e);
       console.log(e);
-    })
+    }) 
   })
   .catch(function(e){
     sendErrorEmail(e);
@@ -145,12 +224,11 @@ function sellOrder(symbol){
   })
 }
 
-function placeOrder(client, symbol, side){
+function placeOrder(client, symbol, side, retry){
   //first set leverage, then purchase amount * leverage
   client.Position.Position_updateLeverage({symbol: 'XBTUSD', leverage: process.env.LEVERAGE})
   .then(function(leverage){
-    console.log(leverage)
-    var percent = leverage;
+    var percent = leverage.obj.initMarginReq + leverage.obj.maintMarginReq + leverage.obj.commission;
     client.User.User_getMargin()
     .then(function(wallet){
       var balance = wallet.obj.availableMargin / 100000000;
@@ -162,15 +240,39 @@ function placeOrder(client, symbol, side){
           var price = orders.obj[24].price;
         }
         var amount = Math.floor((price * balance) * (process.env.LEVERAGE * ((100 - process.env.LEVERAGE * .15)/100)));
-        console.log(amount)
-        if (process.env.ORDER_TYPE === "limit"){
+        if (process.env.ORDER_TYPE === "limit") {
           if (amount > 0) {
             client.Order.Order_new({symbol: symbol, orderQty: amount, price: price, side: side})
             .then(function(order){
               console.log(order)
+              sendLimitOrderEmail(order.obj)
+              setTimeout(function(){
+                pendingOrders.push(order.obj.orderID);
+                openBitmexSocket(symbol);
+                retryLoop(retry - 1, process.env.TIMEOUT, order.obj.orderID, symbol, side, order.obj.price);                
+              },1000)
             })
             .catch(function(e){
-              console.log(e)
+              if (e.obj.error.message.indexOf("insufficient Available Balance")) {
+                var num = parseInt(e.obj.error.message.split(", ")[1].split(" ")[0]);
+                var price = orders.obj[24].price;
+                var balance = (wallet.obj.availableMargin - wallet.obj.grossExecCost);
+                var cost = num / amount;
+                var newAmount = Math.floor(wallet.obj.availableMargin / cost);
+                client.Order.Order_new({symbol: symbol, orderQty: newAmount, price: price, side: side})
+                .then(function(order){
+                  sendLimitOrderEmail(order.obj)
+                  setTimeout(function(){
+                    pendingOrders.push(order.obj.orderID);
+                    openBitmexSocket(symbol);
+                    retryLoop(retry - 1, process.env.TIMEOUT, order.obj.orderID, symbol, side, order.obj.price);
+                  },1000)
+                })
+                .catch(function(e){
+                  console.log(e)
+                  sendErrorEmail(e)
+                })
+              }
             })
           } else { 
             console.log('All funds in use.')
@@ -178,32 +280,33 @@ function placeOrder(client, symbol, side){
         } else {
           client.Order.Order_new({symbol: symbol, ordType: 'Market', orderQty: amount, side: side})
           .then(function(response){
-
+            console.log("Market order placed for " + response.obj.orderQty + " contracts. Order status: " + response.obj.ordStatus)
+            sendMarketOrderEmail(response.obj)
           })
           .catch(function(e) {
             console.log(e)
+            sendErrorEmail(e)
           })
         }
       })
       .catch(
         function(e){
-          sendErrorEmail(e);
           console.log(e);
+          sendErrorEmail(e);
       })
     })
     .catch(function(e){
-      sendErrorEmail(e);
       console.log(e);
+      sendErrorEmail(e);
     })
   })
   .catch(function(e){
-    sendErrorEmail(e);
     console.log(e);
-    console.log("You tried to change the leverage on an already open order and don't have sufficient funds to do so");
+    console.log("You tried to change the leverage on an already open order and don't have sufficient funds to do so.");
+    sendEmail("You tried to change the leverage while an order was already open and don't have sufficient funds to do so.", "BitMEX Bot: Not Enough Funds to Change Leverage. \n", e);
   })
   
 }
-
 
 app.get('/', function (req, res) {
 	res.send('Hello World!');
@@ -220,17 +323,16 @@ app.post('/trade_notification', function(req, res) {
 
   if (pair) {
     if (side === "BUY") {
-      buyOrder(pair)
+      buyOrder(pair, process.env.RETRY)
     } else {
-      console.log(pair)
-      sellOrder(pair)
+      sellOrder(pair, process.env.RETRY)
     }
   }
   res.sendStatus(200);
 });
 
 app.listen(3000, function () {
-	console.log('Example app listening on port 3000!');
+	console.log('BitMEX leverage bot is listening on port 3000!');
 });
 
 function inspect(client) {
@@ -241,5 +343,3 @@ function inspect(client) {
   });
   console.log("------------------------\n");
 }
-
-console.log("Running.")
