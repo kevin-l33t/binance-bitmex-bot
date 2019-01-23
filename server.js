@@ -328,6 +328,7 @@ function placeOrder(client, symbol, side, retry){
 }
 
 app.get('/', function (req, res) {
+  console.log('working')
 	res.send('Hello World!');
 });
 
