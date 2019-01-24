@@ -302,6 +302,9 @@ function placeOrder(client, symbol, side, retry){
                   console.log("There was an issue calculating your max order. Try reducing the leverage.")
                   sendErrorEmail(e)
                 })
+              } else {
+                console.log(e)
+                sendErrorEmail(e)
               }
             })
           } else { 
