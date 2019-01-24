@@ -112,7 +112,7 @@ var api;
 new SwaggerClient({
   // Switch this to `www.bitmex.com` when you're ready to try it out for real.
   // Don't forget the `www`!
-  url: 'https://bitmex.com/api/explorer/swagger.json',
+  url: 'https://testnet.bitmex.com/api/explorer/swagger.json',
   usePromise: true
 })
 .then(function(client) {
@@ -181,8 +181,8 @@ function buyOrder(symbol, retry){
     }) 
   })
   .catch(function(e){
-    sendErrorEmail(e);
     console.log(e);
+    sendErrorEmail(e);
   })
 }
 
