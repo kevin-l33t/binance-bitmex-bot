@@ -24,6 +24,7 @@ function sendEmail(message, subject){
 	  subject: subject,
 	  text: message
 	};
+  console.log(msg)
 	sgMail.send(msg);
 }
 
@@ -35,6 +36,7 @@ function sendLimitOrderEmail(order) {
   orderMsg += "Order Quantity: " + order.orderQty + "\n\n";
   orderMsg += "Order Price: " + order.price + "\n\n";
   orderMsg += "Order Status: " + order.ordStatus + ".";
+  console.log(orderMsg);
   sendEmail(orderMsg, subject);
 }
 
