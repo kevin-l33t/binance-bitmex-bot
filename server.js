@@ -114,7 +114,7 @@ var api;
 new SwaggerClient({
   // Switch this to `www.bitmex.com` when you're ready to try it out for real.
   // Don't forget the `www`!
-  url: 'https://bitmex.com/api/explorer/swagger.json',
+  url: 'https://www.bitmex.com/api/explorer/swagger.json',
   usePromise: true
 })
 .then(function(client) {
