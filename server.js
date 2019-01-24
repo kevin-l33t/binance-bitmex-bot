@@ -14,6 +14,7 @@ var bitmexSocket = new BitMEXClient({testnet: true, apiKeyID: process.env.BITMEX
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
 
 
 function sendEmail(message, subject){
@@ -337,8 +338,7 @@ var bitmexPairs = ['XBTUSD', 'XBTJPY', 'ADAH19', 'BCHH19', 'EOSH19', 'ETHUSD', '
 
 // where text messages are sent
 app.post('/trade_notification', function(req, res) {
-	var tradeNotification = req.body.Body.toLowerCase();
-
+  var tradeNotification = req.body.Body.toLowerCase();
   if (tradeNotification.includes('bitmex')) {
     if (tradeNotification.includes('buy')) {
       for (var i=0; i<bitmexPairs.length; i++) {
@@ -358,7 +358,16 @@ app.post('/trade_notification', function(req, res) {
   res.sendStatus(200);
 });
 
-var server_port = process.env.OPENSHIFT_NODEJS_PORT || 8080
+// where text messages are sent
+app.post('/woowoo', function(req, res) {
+  var tradeNotification = req.body.Body.toLowerCase();
+
+  console.log(tradeNotification)
+
+  res.sendStatus(200);
+});
+
+var server_port = process.env.OPENSHIFT_NODEJS_PORT || 3000
 var server_ip_address = process.env.OPENSHIFT_NODEJS_IP || '0.0.0.0'
 
 app.listen(server_port, server_ip_address, function () {
