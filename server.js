@@ -154,6 +154,10 @@ function buyOrder(symbol, retry){
               console.log("Full balance is invested in an open long position, nothing is being changed.")
             }
           })
+          .catch(function(e){
+            console.log(e);
+            sendErrorEmail(e);
+          })
         // if there is an active short order, close at market
         } else if (activeWallet.currentQty < 0) {
           api.Order.Order_closePosition({symbol: symbol})
@@ -208,6 +212,10 @@ function sellOrder(symbol, retry){
             } else {
               console.log("Full balance is invested in an open short position, nothing is being changed.")
             }
+          })
+          .catch(function(e){
+            console.log(e);
+            sendErrorEmail(e);
           })
         // if there is an active long order, close at market
         } else if (activeWallet.currentQty > 0) {
