@@ -367,11 +367,10 @@ app.post('/woowoo', function(req, res) {
   res.sendStatus(200);
 });
 
-var server_port = process.env.OPENSHIFT_NODEJS_PORT || 3000
-var server_ip_address = process.env.OPENSHIFT_NODEJS_IP || '0.0.0.0'
+var server_port = process.env.PORT || 3000;
 
 app.listen(server_port, server_ip_address, function () {
-	console.log('BitMEX leverage bot is listening on ' + server_ip_address + " port: " + server_port);
+	console.log('BitMEX leverage bot is listening on port: ' + server_port);
 });
 
 function inspect(client) {
