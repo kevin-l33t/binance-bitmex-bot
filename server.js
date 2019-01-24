@@ -9,7 +9,7 @@ var SwaggerClient = require("swagger-client");
 var BitMEXClient = require('bitmex-realtime-api');
 var BitMEXAPIKeyAuthorization = require('./lib/BitMEXAPIKeyAuthorization');
 
-var bitmexSocket = new BitMEXClient({testnet: true, apiKeyID: process.env.BITMEX_API_KEY, apiKeySecret: process.env.BITMEX_API_SECRET});
+var bitmexSocket = new BitMEXClient({testnet: false, apiKeyID: process.env.BITMEX_API_KEY, apiKeySecret: process.env.BITMEX_API_SECRET});
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -114,7 +114,7 @@ var api;
 new SwaggerClient({
   // Switch this to `www.bitmex.com` when you're ready to try it out for real.
   // Don't forget the `www`!
-  url: 'https://testnet.bitmex.com/api/explorer/swagger.json',
+  url: 'https://bitmex.com/api/explorer/swagger.json',
   usePromise: true
 })
 .then(function(client) {
@@ -232,7 +232,7 @@ function sellOrder(symbol, retry){
           })
         }
       } else {
-        console.log('No orders currently open. Placing buy/long order...');
+        console.log('No orders currently open. Placing sell/short order...');
         placeOrder(api, symbol, 'Sell', retry);
       }
     })
@@ -261,7 +261,6 @@ function placeOrder(client, symbol, side, retry){
           var price = orders.obj[25].price;
         } else {
           var price = orders.obj[24].price;
-          console.log(price)
         }
         if (price < 1) {
           var amount = Math.floor((balance / price) * (process.env.LEVERAGE * ((100 - process.env.LEVERAGE * .15)/100)));  
@@ -273,7 +272,7 @@ function placeOrder(client, symbol, side, retry){
           if (amount > 0) {
             client.Order.Order_new({symbol: symbol, orderQty: amount, price: price, side: side})
             .then(function(order){
-              console.log("Limit order placed for " + response.obj.orderQty + " contracts. Order status: " + response.obj.ordStatus)
+              console.log("Limit order placed for " + order.obj.orderQty + " contracts. Order status: " + order.obj.ordStatus)
               sendLimitOrderEmail(order.obj)
               setTimeout(function(){
                 pendingOrders.push(order.obj.orderID);
@@ -290,7 +289,7 @@ function placeOrder(client, symbol, side, retry){
                 var newAmount = Math.floor((wallet.obj.availableMargin / cost) * .98);
                 client.Order.Order_new({symbol: symbol, orderQty: newAmount, price: price, side: side})
                 .then(function(order){
-                  console.log("Limit order placed for " + response.obj.orderQty + " contracts. Order status: " + response.obj.ordStatus)
+                  console.log("Limit order placed for " + order.obj.orderQty + " contracts. Order status: " + order.obj.ordStatus)
                   sendLimitOrderEmail(order.obj)
                   setTimeout(function(){
                     pendingOrders.push(order.obj.orderID);
@@ -367,15 +366,6 @@ app.post('/trade_notification', function(req, res) {
       }
     }
   }
-
-  res.sendStatus(200);
-});
-
-// where text messages are sent
-app.post('/woowoo', function(req, res) {
-  var tradeNotification = req.body.Body.toLowerCase();
-
-  console.log(tradeNotification)
 
   res.sendStatus(200);
 });
