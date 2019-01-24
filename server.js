@@ -369,7 +369,7 @@ app.post('/woowoo', function(req, res) {
 
 var server_port = process.env.PORT || 3000;
 
-app.listen(server_port, server_ip_address, function () {
+app.listen(server_port, function () {
 	console.log('BitMEX leverage bot is listening on port: ' + server_port);
 });
 
