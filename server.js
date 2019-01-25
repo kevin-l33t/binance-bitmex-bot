@@ -333,9 +333,16 @@ function placeOrder(client, symbol, side, retry){
     })
   })
   .catch(function(e){
-    console.log(e);
-    console.log("You tried to change the leverage on an already open order and don't have sufficient funds to do so.");
-    sendEmail("You tried to change the leverage while an order was already open and don't have sufficient funds to do so.", "BitMEX Bot: Not Enough Funds to Change Leverage. \n", e);
+    if (e.obj.error.message.indexOf("system is currently overloaded")) {
+      setTimeout(function(){
+        placeOrder(client, symbol, side, retry)
+      }, 15000)
+      sendEmail("System currently overloaded, tade did not execute. Trying again in 15 seconds.", "BitMEX Bot: System Overload \n"
+    } else {
+      console.log(e);
+      console.log("You tried to change the leverage on an already open order and don't have sufficient funds to do so.");
+      sendEmail("You tried to change the leverage while an order was already open and don't have sufficient funds to do so.", "BitMEX Bot: Not Enough Funds to Change Leverage. \n");     
+    }
   })
   
 }
