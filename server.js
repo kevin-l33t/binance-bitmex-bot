@@ -337,7 +337,7 @@ function placeOrder(client, symbol, side, retry){
       setTimeout(function(){
         placeOrder(client, symbol, side, retry)
       }, 15000)
-      sendEmail("System currently overloaded, tade did not execute. Trying again in 15 seconds.", "BitMEX Bot: System Overload \n"
+      sendEmail("System currently overloaded, tade did not execute. Trying again in 15 seconds.", "BitMEX Bot: System Overload \n")
     } else {
       console.log(e);
       console.log("You tried to change the leverage on an already open order and don't have sufficient funds to do so.");
