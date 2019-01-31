@@ -4,14 +4,21 @@ var express = require('express');
 var app = express();
 var bodyParser = require('body-parser');
 
-// var bitmex = require('./lib/bitmex');
+var bitmex = require('./lib/bitmex');
 var binance = require('./lib/binance');
+
+var binanceAPI = require('node-binance-api')().options({
+  APIKEY: process.env.BINANCE_API_KEY,
+  APISECRET: process.env.BINANCE_API_SECRET
+});
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-// var bitmexBuyOrder = bitmex.buyOrder;
-// var bitmexSellOrder = bitmex.sellOrder;
+var bitmexBuyOrder = bitmex.buyOrder;
+var bitmexSellOrder = bitmex.sellOrder;
+
+var binanceOrder = binance.placeOrder;
 
 app.get('/', function (req, res) {
   console.log('working')
@@ -20,7 +27,21 @@ app.get('/', function (req, res) {
 
 
 var bitmexPairs = ['XBTUSD', 'XBTJPY', 'ADAH19', 'BCHH19', 'EOSH19', 'ETHUSD', 'LTCH19', 'TRXH19', 'XRPH19', 'XBTKRW'];
-// var binancePairs = 
+var binancePairs
+
+function getTickers() {
+  binanceAPI.prices((error, ticker) => {
+    if (error) {
+      console.log(error);
+      return
+    }
+    if (ticker) {
+      binancePairs = Object.keys(ticker)
+    }
+  });
+}
+
+getTickers()
 
 // where text messages are sent
 app.post('/trade_notification', function(req, res) {
@@ -39,8 +60,21 @@ app.post('/trade_notification', function(req, res) {
         }
       }
     }
+  } else if (tradeNotification.includes('binance')) {
+    if (tradeNotification.includes('buy')) {
+      for (var i=0; i<binancePairs.length; i++) {
+        if (tradeNotification.includes(binancePairs[i].toLowerCase())) {
+          binanceOrder(binancePairs[i], 'BUY', process.env.BINANCE_ORDER_TYPE, process.env.RETRY)
+        }
+      }
+    } else if (tradeNotification.includes('sell')) {
+      for (var i=0; i<binancePairs.length; i++) {
+        if (tradeNotification.includes(binancePairs[i].toLowerCase())) {
+          binanceOrder(binancePairs[i], 'SELL', process.env.BINANCE_ORDER_TYPE, process.env.RETRY)
+        }
+      }
+    }
   }
-
   res.sendStatus(200);
 });
 
