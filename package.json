@@ -10,6 +10,9 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js"
   },
+  "events": {
+    "crash": "nodemon server.js"
+  },
   "author": "",
   "license": "ISC",
   "dependencies": {
