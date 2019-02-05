@@ -46,16 +46,19 @@ getTickers()
 // where text messages are sent
 app.post('/trade_notification', function(req, res) {
   var tradeNotification = req.body.Body.toLowerCase();
+  console.log('NOTIFICATION: ', tradeNotification)
   if (tradeNotification.includes('bitmex')) {
     if (tradeNotification.includes('buy')) {
       for (var i=0; i<bitmexPairs.length; i++) {
         if (tradeNotification.includes(bitmexPairs[i].toLowerCase())) {
+          console.log('bitmex buy order')
           bitmexBuyOrder(bitmexPairs[i], process.env.RETRY)
         }
       }
     } else if (tradeNotification.includes('sell')) {
       for (var i=0; i<bitmexPairs.length; i++) {
         if (tradeNotification.includes(bitmexPairs[i].toLowerCase())) {
+          console.log('bitmex sell order')
           bitmexSellOrder(bitmexPairs[i], process.env.RETRY)
         }
       }
@@ -64,12 +67,14 @@ app.post('/trade_notification', function(req, res) {
     if (tradeNotification.includes('buy')) {
       for (var i=0; i<binancePairs.length; i++) {
         if (tradeNotification.includes(binancePairs[i].toLowerCase())) {
+          console.log('binance buy order')
           binanceOrder(binancePairs[i], 'BUY', process.env.BINANCE_ORDER_TYPE, process.env.RETRY)
         }
       }
     } else if (tradeNotification.includes('sell')) {
       for (var i=0; i<binancePairs.length; i++) {
         if (tradeNotification.includes(binancePairs[i].toLowerCase())) {
+          console.log('binance sell order')
           binanceOrder(binancePairs[i], 'SELL', process.env.BINANCE_ORDER_TYPE, process.env.RETRY)
         }
       }
