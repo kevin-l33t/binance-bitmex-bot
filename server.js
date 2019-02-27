@@ -82,7 +82,7 @@ app.post('/trade_notification', function(req, res) {
           console.log('binance buy order')
           binanceOrder(binancePairs[i], 'BUY', process.env.BINANCE_ORDER_TYPE, process.env.RETRY)
         } else {
-          if (i === bitmexPairs.length - 1) {
+          if (i === binance.length - 1) {
             email.sendTextErrorEmail("Binance bot could not identify a pair to buy or sell based on the text message. Make sure each text includes a pair string WITHOUT a '/', like so 'ethpax' (not case sensitive). Here is the message you sent: \n" + tradeNotification)
           }
         }
@@ -93,7 +93,7 @@ app.post('/trade_notification', function(req, res) {
           console.log('binance sell order')
           binanceOrder(binancePairs[i], 'SELL', process.env.BINANCE_ORDER_TYPE, process.env.RETRY)
         } else {
-          if (i === bitmexPairs.length - 1) {
+          if (i === binance.length - 1) {
             email.sendTextErrorEmail("Binance bot could not identify a pair to buy or sell based on the text message. Make sure each text includes a pair string WITHOUT a '/', like so 'ethpax' (not case sensitive). Here is the message you sent: \n" + tradeNotification)
           }
         }
