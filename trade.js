@@ -1,4 +1,4 @@
-require('dotenv').config();
+// require('dotenv').config();
 
 var bitmex = require('./lib/bitmex');
 var binance = require('./lib/binance');
@@ -61,7 +61,7 @@ function trade(tradeNotification) {
             for (var i = 0; i < binancePairs.length; i++) {
                 if (tradeNotification.includes(binancePairs[i])) {
                     console.log('binance buy order')
-                    binanceOrder(binancePairs[i], 'BUY', process.env.ORDER_TYPE, process.env.RETRY)
+                    binanceOrder(binancePairs[i], 'BUY', process.env.BINANCE_ORDER_TYPE, process.env.RETRY)
                 } else {
                     if (i === binance.length - 1) {
                         email.sendTextErrorEmail("Binance bot could not identify a pair to buy or sell based on the text message. Make sure each text includes a pair string WITHOUT a '/', like so 'ethpax' (not case sensitive). Here is the message you sent: \n" + tradeNotification)
@@ -72,7 +72,7 @@ function trade(tradeNotification) {
             for (var i = 0; i < binancePairs.length; i++) {
                 if (tradeNotification.includes(binancePairs[i])) {
                     console.log('binance sell order')
-                    binanceOrder(binancePairs[i], 'SELL', process.env.ORDER_TYPE, process.env.RETRY)
+                    binanceOrder(binancePairs[i], 'SELL', process.env.BINANCE_ORDER_TYPE, process.env.RETRY)
                 } else {
                     if (i === binance.length - 1) {
                         email.sendTextErrorEmail("Binance bot could not identify a pair to buy or sell based on the text message. Make sure each text includes a pair string WITHOUT a '/', like so 'ethpax' (not case sensitive). Here is the message you sent: \n" + tradeNotification)
