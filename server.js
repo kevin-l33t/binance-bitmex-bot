@@ -10,7 +10,7 @@ app.use(bodyParser.json());
 
 app.get('/', function (req, res) {
   console.log('working')
-  res.send('Hello World!');
+  res.send('Trading Bot is working!');
 });
 
 // where text messages are sent
