@@ -3,7 +3,7 @@ const imaps = require('imap-simple');
 var trade = require('./trade');
 var _ = require('lodash');
 
-const jobImap = new CronJob('*/15 * * * * *', () => {
+const jobImap = new CronJob('*/20 * * * * *', () => {
 	const d = new Date();
     console.log('checking emails :', d);
     
