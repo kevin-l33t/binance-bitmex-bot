@@ -33,7 +33,7 @@ var bitmexSellOrder = bitmex.sellOrder;
 var binanceOrder = binance.placeOrder;
 
 function trade(tradeNotification) {
-    if (tradeNotification.includes('Bitmex')) {
+    if (tradeNotification.includes('bitmex')) {
         if (tradeNotification.includes('BUY')) {
             for (var i = 0; i < bitmexPairs.length; i++) {
                 // console.log(bitmexPairs[i].toLowerCase(), tradeNotification)
