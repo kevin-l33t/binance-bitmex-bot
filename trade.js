@@ -1,4 +1,4 @@
-// require('dotenv').config();
+require('dotenv').config();
 
 var bitmex = require('./lib/bitmex');
 var binance = require('./lib/binance');
